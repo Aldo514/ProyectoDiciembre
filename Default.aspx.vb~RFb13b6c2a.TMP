@@ -1,0 +1,672 @@
+﻿Imports System.Data
+Imports System.Data.OleDb
+Imports System.Data.SqlClient
+Imports System.Data.SqlTypes
+Imports System.Text
+Imports System.Configuration
+Imports System.IO
+Imports System.Security.Cryptography.X509Certificates
+Imports System.Xml
+Imports System.Reflection
+Imports System.Net
+
+Partial Class _Default
+    Inherits System.Web.UI.Page
+
+    Dim xmlER As XElement, xmlEP As XElement, xmlDS As DataSet
+    Dim sRespCod As String, sRespDoc As String, sPetCod As String, sPetDoc As String, sRespPol As String, sPetPol As String
+
+    Sub f1(ByVal xmle As XElement)
+        Dim a As XElement
+
+        For i As Integer = 0 To xmle.Nodes.Count - 1
+            a = xmle.Nodes(i)
+        Next
+
+    End Sub
+
+    Protected Sub seci_Click(ByVal sender As Object, ByVal e As System.EventArgs) Handles seci.Click
+        Dim nif = TextBox1.Text
+        Session("nif") = nif
+        Dim url As String = "C:/Users/T0037135.GRUPOECI/Documents/ServicioWEB_SECI/Default.aspx"
+        Dim s As String = "window.open('" & url + "', '_self');"
+        ClientScript.RegisterStartupScript(Me.GetType(), "script", s, True)
+        System.Diagnostics.Debug.WriteLine(nif)
+    End Sub
+
+    Protected Sub Button3_Click(ByVal sender As Object, ByVal e As System.EventArgs) Handles Button3.Click
+        Button3.Enabled = False
+        Dim dcliente As New es.elcorteingles.webservices.OperacionesSegurosService
+        Const ctepathcert As String = "Certificado\ACCESO_SEGUROS_PRO.p12"
+        Dim certRawData As Byte() = System.IO.File.ReadAllBytes(Server.MapPath(ctepathcert))
+
+
+        Dim x5092 As New X509Certificate2(certRawData, "SEGUROS_ACCESO", _
+                         X509KeyStorageFlags.MachineKeySet + X509KeyStorageFlags.PersistKeySet + X509KeyStorageFlags.Exportable)
+
+        dcliente.ClientCertificates.Add(x5092)
+        System.Net.ServicePointManager.ServerCertificateValidationCallback = AddressOf AcceptAllCertifications
+
+
+        Dim ncliente As String
+        Dim CodigoError As Byte
+        Dim B As XElement
+        Dim fechaActual As Date
+        Dim añoActual As Integer
+        fechaActual = Today
+        añoActual = Year(fechaActual)
+
+        dcliente.Url = "https://webservices.elcorteingles.es/multiseginternetws/services/OperacionesSeguros"
+
+        sPetDoc = "<peticion><consulta><numeroIP>172.16.11.31</numeroIP><codparnet>MPMSEGUR</codparnet><password>12345678</password><numtransa>TSA6000000</numtransa><tipodocumento>" & CodigoNIF(DropDownList5.Text) & "</tipodocumento><documento>0" & UCase(TextBox1.Text) & "</documento></consulta></peticion>"
+
+        sRespDoc = dcliente.BuscarDatosClienteDocumento(sPetDoc)
+
+        xmlER = XElement.Parse(sRespDoc)
+        xmlEP = XElement.Parse(sPetDoc).Nodes(0)
+        'System.Diagnostics.Debug.WriteLine(xmlER) 'console DATOS PERSONALES
+
+        B = xmlER.Nodes(1)
+        CodigoError = B.Value
+
+        If CodigoError = 0 Then
+            alerta.Style.Add("display", "none")
+            B = xmlER.Nodes(3)
+            ncliente = B.Value
+            TextBox2.Text = ncliente
+            ' Datos de Cliente
+
+            B = xmlER.Nodes(1)
+
+            If DropDownList5.Text = "CIF" Then
+
+                If B.Value = 0 Then
+
+                    B = xmlER.Nodes(18)
+                    TextBox3.Text = Trim(Mid(B.Value, 1, 10))
+                    TextBox4.Text = Trim(Mid(B.Value, 11, 30))
+                    TextBox5.Text = Trim(Mid(B.Value, 42, 30))
+
+                    B = xmlER.Nodes(21)
+                    TextBox18.Text = B.Value ' Telefono 
+
+                    B = xmlER.Nodes(22)
+                    TextBox19.Text = B.Value ' Telefono2  
+                End If
+
+            Else
+                If B.Value = 0 Then
+                    B = xmlER.Nodes(9)
+                    TextBox3.Text = B.Value  ' Nombre
+
+                    B = xmlER.Nodes(10)
+                    TextBox4.Text = B.Value  ' Apellido1
+
+                    B = xmlER.Nodes(11)
+                    TextBox5.Text = B.Value  ' Apellido2
+
+                    B = xmlER.Nodes(13)      ' Sexo
+                    Select Case B.Value
+                        Case "M"
+                            TextBox22.Text = "FEMENINO"
+                        Case "V"
+                            TextBox22.Text = "MASCULINO"
+                    End Select
+
+                    B = xmlER.Nodes(12)       ' Edad
+                    Dim anno As String = Mid(B, 1, 4)
+                    Dim edad As Integer = añoActual - Int(anno)
+
+                    TextBox23.Text = edad
+
+                    B = xmlER.Nodes(21)
+                    TextBox18.Text = B.Value ' Telefono 
+
+                    B = xmlER.Nodes(23)
+                    TextBox19.Text = B.Value ' Telefono2
+
+                    For i = 28 To 35
+                        If i <> 29 Then
+                            B = xmlER.Nodes(i)
+                            TextBox20.Text += B.Value ' Calle
+                            TextBox20.Text += " "
+                        End If
+                    Next
+
+                    B = xmlER.Nodes(36)
+                    TextBox24.Text = B.Value ' Localidad
+
+                    B = xmlER.Nodes(38)
+                    TextBox25.Text = B.Value ' Codigo postal
+
+                    B = xmlER.Nodes(25)
+                    TextBox21.Text = B.Value ' Email
+
+                End If
+            End If
+
+            sPetPol = "<peticion> <consulta> <numeroIP>172.16.11.31</numeroIP> <codparnet>MPMSEGUR</codparnet> <password>12345678</password> <numtransa>TSA6000000</numtransa> <cliente>" & ncliente & "</cliente> </consulta> </peticion>"
+            sRespPol = dcliente.damePolSolRecoCliente(sPetPol)
+
+            MisPolizas()
+
+        ElseIf Len(TextBox1.Text) <> 9 Then
+            alerta.Style.Add("display", "block")
+            Button3.Enabled = True
+        Else
+            alerta.Style.Add("display", "block")
+            Button3.Enabled = True
+        End If
+
+
+    End Sub
+
+    Public Function AcceptAllCertifications() As Boolean
+        Return True
+    End Function
+
+    Protected Sub MisPolizas()
+        Conectar()
+        Dim nombreGrupo As String = ""
+        Dim control_1Polizas As Integer = 0
+        Dim Tabla1Poliza(10) As String
+        Dim controlSpto As String = ""
+        Dim cont As Integer = 0
+        Dim polizaBasica As Integer = 0
+        Dim DescProd As String = ""
+        Dim polizaAnul As Integer = 0
+        Dim polizaVida As Integer = 0
+        Dim polizaVidaAnul As Integer = 0
+        Dim polizaAccidente As Integer = 0
+        Dim polizaAccidenteAnul As Integer = 0
+        Dim polizaAutos As Integer = 0
+        Dim polizaAutosAnul As Integer = 0
+        Dim polizaHogar As Integer = 0
+        Dim polizaHogarAnul As Integer = 0
+        Dim polizaSanitaria As Integer = 0
+        Dim polizaSanitariaAnul As Integer = 0
+        Dim codprod As String = ""
+        Dim codprod2 As String = ""
+        Dim polizaNoBasica As Integer = 0
+        TextBox26.Text = "BRONCE"
+
+        GridView1.DataSource = Nothing
+        GridView1.Visible = False
+
+        GridView2.DataSource = Nothing
+        GridView2.Visible = False
+
+        Dim respuesta As XElement
+        Dim acum As XElement
+        Dim respuestaString(12) As String
+
+        Dim ds As DataSet
+        ds = New DataSet()
+        Dim dt As DataTable
+        dt = New DataTable
+
+        ds.Tables.Add(dt)
+        dt.Columns.Add("Producto")
+        dt.Columns.Add("Descripcion")
+        dt.Columns.Add("Grupo")
+        dt.Columns.Add("Poliza")
+        dt.Columns.Add("Certificado")
+        dt.Columns.Add("Fefecto")
+        dt.Columns.Add("F_Anu")
+        dt.Columns.Add("Estado")
+        dt.Columns.Add("prima_neta")
+        dt.Columns.Add("prima_total")
+
+        Dim ds1 As DataSet
+        ds1 = New DataSet()
+        Dim dt1 As DataTable
+        dt1 = New DataTable
+
+        ds1.Tables.Add(dt1)
+        dt1.Columns.Add("Producto")
+        dt1.Columns.Add("Descripcion")
+        dt1.Columns.Add("Grupo")
+        dt1.Columns.Add("Poliza")
+        dt1.Columns.Add("Certificado")
+        dt1.Columns.Add("Fefecto")
+        dt1.Columns.Add("F_Anu")
+        dt1.Columns.Add("Estado")
+        dt1.Columns.Add("prima_neta")
+        dt1.Columns.Add("prima_total")
+
+        Dim quePoliza As Integer, nmroPolizas As Integer
+        xmlEP = XElement.Parse(sPetPol).Nodes(0)
+        xmlER = XElement.Parse(Replace(sRespPol, "&", "")).Nodes(5)
+        'System.Diagnostics.Debug.WriteLine(xmlER) 'console POLIZAS
+
+        If InStr(sRespPol, "<coderror>0") <> 0 Then
+
+            nmroPolizas = xmlER.Nodes.Count
+
+            Do While Not quePoliza = CInt(nmroPolizas.ToString())
+
+                xmlEP = XElement.Parse(sPetPol).Nodes(0)
+                xmlER = XElement.Parse(Replace(sRespPol, "&", "")).Nodes(5)
+
+                Integer.TryParse(HiddenNPolizas.Value, quePoliza)
+                If quePoliza > nmroPolizas - 1 Then quePoliza = nmroPolizas - 1
+                If quePoliza < 0 Then quePoliza = 0
+
+
+                HiddenNPolizas.Value = quePoliza.ToString
+
+
+                xmlER = xmlER.Nodes(quePoliza)
+                f1(xmlEP)
+                f1(xmlER)
+
+                respuesta = xmlER.Nodes(0)   ' Compañia
+                respuestaString(0) = respuesta.Value
+
+                respuesta = xmlER.Nodes(1)   ' Producto
+                respuestaString(1) = respuesta.Value
+
+                respuesta = xmlER.Nodes(2)   ' Poliza   
+                respuestaString(3) = respuesta.Value
+
+                respuesta = xmlER.Nodes(3)    ' Certificado
+                respuestaString(4) = respuesta.Value
+
+
+                respuesta = xmlER.Nodes(5)    ' Fecha Efecto
+                respuestaString(5) = Mid(respuesta.Value, 7, 2) & "/" & Mid(respuesta.Value, 5, 2) & "/" & Mid(respuesta.Value, 1, 4)
+
+                respuesta = xmlER.Nodes(6)    ' Fecha Anulacion
+                respuestaString(7) = Mid(respuesta.Value, 7, 2) & "/" & Mid(respuesta.Value, 5, 2) & "/" & Mid(respuesta.Value, 1, 4)
+
+                respuesta = xmlER.Nodes(8)    ' Estado
+                respuestaString(6) = respuesta.Value
+
+                respuesta = xmlER.Nodes(15)    ' Prima Neta
+                respuestaString(11) = respuesta.Value
+
+                respuesta = xmlER.Nodes(16)    ' Prima Total
+                respuestaString(12) = respuesta.Value
+
+                respuesta = xmlER.Nodes(4)    ' Forma Pago
+                DescProd = respuesta.Value
+
+                controlSpto = ""
+                respuesta = xmlER.Nodes(12)
+                controlSpto = respuesta.Value
+
+                respuesta = xmlER.Nodes(6)     ' Fecha Anulacion
+                respuestaString(8) = respuesta.Value
+
+                respuesta = xmlER.Nodes(10)     ' Estado Solicitud
+
+                respuestaString(9) = respuesta.Value
+
+                quePoliza = quePoliza + 1
+                HiddenNPolizas.Value = quePoliza
+
+
+                Dim cmd As New OleDbCommand("SELECT * FROM Grseg", conexion)
+                Dim dr As OleDbDataReader = cmd.ExecuteReader
+
+                ' Control de Polizas
+                If controlSpto = "00" Or controlSpto = "" Then ' Control Suplemento
+                    acum = xmlER.Nodes(8)
+
+                    Dim prod As String
+                    Dim grseg As String
+                    Dim grupo As String
+
+                    If acum = "PD" Then
+
+                        codprod = respuestaString(0) + respuestaString(1)
+                        'System.Diagnostics.Debug.WriteLine(codprod)
+
+                        While dr.Read
+                            prod = dr!Prod.ToString
+                            grupo = dr!grupo.ToString
+                            grseg = dr!Grseg.ToString
+
+                            If prod = codprod Then
+                                nombreGrupo = grupo
+
+                                If grupo = "BASICOS" Then
+                                    polizaBasica = polizaBasica + 1
+                                    cont = cont + 1
+
+                                ElseIf grupo = "NO BASICOS" Then
+                                    polizaNoBasica = polizaNoBasica + 1
+                                End If
+
+                                Select Case grseg
+                                    Case "VIDA NO BASICOS"
+                                        polizaVida = polizaVida + 1
+                                    Case "VIDA EMPRESAS"
+                                        polizaVida = polizaVida + 1
+                                    Case "VIDA"
+                                        polizaVida = polizaVida + 1
+                                    Case "ACCIDENTES NO BASICOS"
+                                        polizaAccidente = polizaAccidente + 1
+                                    Case "ACCIDENTES EMPRESAS"
+                                        polizaAccidente = polizaAccidente + 1
+                                    Case "ACCIDENTES"
+                                        polizaAccidente = polizaAccidente + 1
+                                    Case "AUTOS/MOTOS EMPRESAS"
+                                        polizaAutos = polizaAutos + 1
+                                    Case "AUTOS/MOTOS"
+                                        polizaAutos = polizaAutos + 1
+                                    Case "HOGAR"
+                                        polizaHogar = polizaHogar + 1
+                                    Case "ASISTENCIA SANITARIA EMPRESAS"
+                                        polizaSanitaria = polizaSanitaria + 1
+                                    Case "ASISTENCIA SANITARIA"
+                                        polizaSanitaria = polizaSanitaria + 1
+                                End Select
+                            End If
+                        End While
+                        If respuestaString(7) = "//" Then
+                            respuestaString(7) = ""
+                        End If
+                        respuestaString(6) = "<strong><span style='color: green;'>" + respuestaString(6) + "</span></strong>"
+                        respuestaString(11) = "<span class='valores'>" + respuestaString(11) + "</span>"
+                        respuestaString(12) = "<span class='valores'>" + respuestaString(12) + "</span>"
+                        dt.Rows.Add(respuestaString(0) + respuestaString(1), DescProd, nombreGrupo, respuestaString(3), respuestaString(4), respuestaString(5), respuestaString(7), respuestaString(6), respuestaString(11), respuestaString(12))
+
+                    End If
+
+                    campoBasico.Text = polizaBasica
+                    campoVida.Text = polizaVida
+                    campoAccidentes.Text = polizaAccidente
+                    campoAutomoviles.Text = polizaAutos
+                    campoHogar.Text = polizaHogar
+                    campoSanitaria.Text = polizaSanitaria
+                    campoNoBasico.Text = polizaNoBasica
+
+                    Select Case polizaBasica
+                        Case 0
+                            TextBox26.Text = "BRONCE"
+                        Case 1
+                            TextBox26.Text = "PLATA"
+                        Case 2
+                            TextBox26.Text = "ORO"
+                        Case Else
+                            TextBox26.Text = "PLATINO"
+                    End Select
+
+                    If acum = "AN" Or (acum <> "AN" And acum <> "PD") Then 'polizas anuladas
+                        codprod2 = respuestaString(0) + respuestaString(1)
+                        'System.Diagnostics.Debug.WriteLine(codprod2)
+
+                        While dr.Read
+                            prod = dr!Prod.ToString
+                            grupo = dr!grupo.ToString
+                            grseg = dr!Grseg.ToString
+
+                            If prod = codprod2 Then
+
+                                nombreGrupo = grupo
+
+                                If grupo = "BASICOS" Then
+                                    polizaAnul = polizaAnul + 1
+                                End If
+
+                                Select Case grseg
+                                    Case "VIDA NO BASICOS"
+                                        polizaVidaAnul = polizaVidaAnul + 1
+                                    Case "VIDA EMPRESAS"
+                                        polizaVidaAnul = polizaVidaAnul + 1
+                                    Case "VIDA"
+                                        polizaVidaAnul = polizaVidaAnul + 1
+                                    Case "ACCIDENTES NO BASICOS"
+                                        polizaAccidenteAnul = polizaAccidenteAnul + 1
+                                    Case "ACCIDENTES EMPRESAS"
+                                        polizaAccidenteAnul = polizaAccidenteAnul + 1
+                                    Case "ACCIDENTES"
+                                        polizaAccidenteAnul = polizaAccidenteAnul + 1
+                                    Case "AUTOS/MOTOS EMPRESAS"
+                                        polizaAutosAnul = polizaAutosAnul + 1
+                                    Case "AUTOS/MOTOS"
+                                        polizaAutosAnul = polizaAutosAnul + 1
+                                    Case "HOGAR"
+                                        polizaHogarAnul = polizaHogarAnul + 1
+                                    Case "ASISTENCIA SANITARIA EMPRESAS"
+                                        polizaSanitariaAnul = polizaSanitariaAnul + 1
+                                    Case "ASISTENCIA SANITARIA"
+                                        polizaSanitariaAnul = polizaSanitariaAnul + 1
+                                End Select
+                            End If
+
+                        End While
+                        If respuestaString(7) = "//" Then
+                            respuestaString(7) = ""
+                        End If
+                        respuestaString(6) = "<strong><span style='color: red;'>" + respuestaString(6) + "</span></strong>"
+                        respuestaString(11) = "<span class='valores'>" + respuestaString(11) + "</span>"
+                        respuestaString(12) = "<span class='valores'>" + respuestaString(12) + "</span>"
+                        dt1.Rows.Add(respuestaString(0) + respuestaString(1), DescProd, nombreGrupo, respuestaString(3), respuestaString(4), respuestaString(5), respuestaString(7), respuestaString(6), respuestaString(11), respuestaString(12))
+                        dt1.DefaultView.Sort = "Estado ASC"
+                    End If
+                    basicoAnulado.Text = polizaAnul
+                    vidaAnulado.Text = polizaVidaAnul
+                    accidentesAnulado.Text = polizaAccidenteAnul
+                    autoAnulado.Text = polizaAutosAnul
+                    hogarAnulado.Text = polizaHogarAnul
+                    sanitariaAnulado.Text = polizaSanitariaAnul
+
+                End If
+
+                dr.Close()
+                cmd.Dispose()
+                Desconectar()
+            Loop
+
+            HiddenNPolizas.Value = ""
+            GridView1.DataSource = ds.Tables(0)
+            GridView1.Visible = True
+            GridView1.DataBind()
+
+            HiddenNPolizas.Value = ""
+            GridView2.DataSource = ds1.Tables(0)
+            GridView2.Visible = True
+            GridView2.DataBind()
+
+        End If
+
+    End Sub
+
+    Private Function CodigoNIF(ByVal valor As String) As String
+
+        If valor = "NIF" Then
+            CodigoNIF = "A001"
+        ElseIf valor = "NIE" Then
+            CodigoNIF = "C003"
+        ElseIf valor = "CIF" Then
+            CodigoNIF = "E005"
+        ElseIf valor = "PASAPORTE" Then
+            CodigoNIF = "F006"
+        End If
+
+    End Function
+
+    Private Sub Limpieza_Cliente()
+
+        DropDownList5.Text = "NIF"
+        TextBox1.Text = ""
+        TextBox2.Text = ""
+        TextBox3.Text = ""
+        TextBox4.Text = ""
+        TextBox5.Text = ""
+        TextBox18.Text = ""
+        TextBox19.Text = ""
+        TextBox20.Text = " "
+        TextBox21.Text = " "
+        TextBox22.Text = " "
+        TextBox23.Text = " "
+        TextBox24.Text = " "
+        TextBox25.Text = " "
+        TextBox26.Text = " "
+        gastoTienda.Text = ""
+        gastoTienda.Text = ""
+        Lbl_NoCliente.Text = ""
+        campoBasico.Text = 0
+        campoVida.Text = 0
+        campoAccidentes.Text = 0
+        campoAutomoviles.Text = 0
+        campoHogar.Text = 0
+        campoSanitaria.Text = 0
+        campoNoBasico.Text = 0
+        basicoAnulado.Text = 0
+        vidaAnulado.Text = 0
+        accidentesAnulado.Text = 0
+        autoAnulado.Text = 0
+        hogarAnulado.Text = 0
+        sanitariaAnulado.Text = 0
+        GridView1.DataSource = Nothing
+        GridView1.Visible = False
+        GridView2.DataSource = Nothing
+        GridView2.Visible = False
+    End Sub
+
+    Protected Sub Button4_Click(ByVal sender As Object, ByVal e As System.EventArgs) Handles Button4.Click
+        hdf_Test.Value = 0
+        Limpieza_Cliente()
+        Button3.Enabled = True
+        alerta.Style.Add("display", "none")
+        corX.Value = ""
+        corY.Value = ""
+        Desconectar()
+    End Sub
+
+    Protected Overrides Sub Finalize()
+        MyBase.Finalize()
+    End Sub
+    Protected Sub TextBox1_TextChanged(sender As Object, e As EventArgs) Handles TextBox1.TextChanged
+
+    End Sub
+
+
+    Private conexion As OleDbConnection
+
+    Private Sub Conectar()
+        Try
+            conexion = New OleDbConnection("Provider=Microsoft.Jet.OLEDB.4.0;Data Source=" & Server.MapPath("App_data\bd.mdb") & ";Persist Security Info=False;Jet OLEDB:Database Password=prodat00")
+            If conexion.State = ConnectionState.Closed Then conexion.Open()
+        Catch ex As Exception
+            Throw New Exception("No se ha podido conectar a la Base de datos. " + ex.Message)
+        End Try
+    End Sub
+    Private Sub Desconectar()
+        Try
+            If conexion Is Nothing Then
+                If conexion.State <> ConnectionState.Closed Then conexion.Close()
+                conexion.Dispose()
+                conexion = Nothing
+            End If
+        Catch ex As Exception
+            Throw New Exception("No se ha podido cerrar la Base de datos")
+        End Try
+    End Sub
+
+    Protected Sub Pensiones(ByVal sender As Object, ByVal e As System.EventArgs) Handles Me.Load
+        Conectar()
+        Dim nif As String
+        nif = UCase(TextBox1.Text)
+
+        Dim cmd As New OleDbCommand("SELECT * FROM PensionesCess WHERE Nif = @nif ", conexion)
+        cmd.Parameters.AddWithValue("@id", nif)
+        Dim dr As OleDbDataReader = cmd.ExecuteReader
+        Dim DesFondo As String = ""
+        Dim fechaPension As String = ""
+        Dim derechos As String = ""
+
+        While dr.Read
+            DesFondo = dr!DesFondo.ToString
+            fechaPension = dr!FValCoti.ToString
+            derechos = dr!Derechos.ToString + " €"
+        End While
+
+        If DesFondo = "" Then
+            PensionesCess.Visible = False
+        Else
+            PensionesCess.Visible = True
+        End If
+        'Rellenar campos:
+        pension1.Text = DesFondo
+        pension1.Attributes("value") = DesFondo
+        pension2.Text = Mid(fechaPension, 1, 10)
+        pension3.Text = derechos
+
+        dr.Close()
+        cmd.Dispose()
+    End Sub
+
+    Protected Sub Andbank(ByVal sender As Object, ByVal e As System.EventArgs) Handles Me.Load
+        Conectar()
+
+        Dim cmd As New OleDbCommand("SELECT Nif, DesProd, FValCoti, PatriEur, PatriEur FROM AndBank", conexion)
+        Dim dr As OleDbDataReader = cmd.ExecuteReader
+        Dim DesProd As String = ""
+        Dim fechaAndBank As String = ""
+        Dim patrimonio As String = ""
+        Dim total As String = ""
+        Dim contador As Integer = 0
+
+        Dim bdNif As String = ""
+        Dim nif As String = ""
+        nif = UCase(TextBox1.Text)
+
+        While dr.Read
+            bdNif = dr!Nif.ToString
+            If bdNif = nif Then
+                DesProd = dr!DesProd.ToString
+                fechaAndBank = Mid(dr!FValCoti.ToString, 1, 10)
+                patrimonio = dr!PatriEur.ToString + " €"
+                total += DesProd + String.Format(Environment.NewLine) + fechaAndBank + String.Format(Environment.NewLine) + patrimonio + String.Format(Environment.NewLine) + String.Format(Environment.NewLine)
+                contador = contador + 4
+            End If
+            'Rellenar campos:
+            campoAnd.Text = total
+            hdf_Test.Value = contador
+        End While
+
+        If campoAnd.Text = "" Then
+            DivAndbank.Visible = False
+        Else
+            DivAndbank.Visible = True
+        End If
+
+        dr.Close()
+        cmd.Dispose()
+    End Sub
+    Protected Sub ValorECI(ByVal sender As Object, ByVal e As System.EventArgs) Handles Me.Load
+        Conectar()
+        Dim nif As String
+        nif = UCase(TextBox1.Text)
+
+        Dim cmd As New OleDbCommand("SELECT GASTO2018, VALOR_ECI, CO_COORD_X, CO_COORD_Y FROM VALORECI WHERE DNI = @nif", conexion)
+        cmd.Parameters.AddWithValue("@id", nif)
+        Dim dr As OleDbDataReader = cmd.ExecuteReader
+
+        Dim gasto As String = "Sin Datos"
+        Dim valor As String = "Sin Datos"
+        Dim coX As String = ""
+        Dim coY As String = ""
+
+        While dr.Read
+            gasto = dr!GASTO2018.ToString + " €"
+            valor = dr!VALOR_ECI.ToString
+            coX = dr!CO_COORD_X.ToString
+            coY = dr!CO_COORD_Y.ToString
+        End While
+
+        'Rellenar campos : 
+        gastoTienda.Text = gasto
+        valorTienda.Text = valor
+        corX.Value = Replace(coX, ",", ".")
+        corY.Value = Replace(coY, ",", ".")
+
+        dr.Close()
+        cmd.Dispose()
+        Desconectar()
+    End Sub
+End Class
