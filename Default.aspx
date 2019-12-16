@@ -9,7 +9,7 @@
 	<script src="https://ajax.googleapis.com/ajax/libs/d3js/5.7.0/d3.min.js"></script>
     <script src="//code.jquery.com/jquery-1.12.1.min.js"></script>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-    <title>Valor de clientes</title>
+    <title>Cooking</title>
 	<link rel="stylesheet" href="css/estilos.css">
 	<script src="js/search.js"></script>
 </head>
@@ -20,7 +20,7 @@
         <div class="jumbotron jumbotron-fluid bg-success text-white-50 col-md-12 pb-4 pt-4 shadow-sm">
             <div class="container">
                 <div class="row">
-                    <div class="col-6 col-md-2 col-lg-2"><h1 class="display-4">Cooking</h1></div>
+                    <div class="col-6 col-md-2 col-lg-2"><a href="Default.aspx"><h1 class="display-4">Cooking</h1></a></div>
                     <div class="col-6 col-md-6 col-lg-6 mt-2 pl-4"><img id="icono-footer" src="img/icons/logo.svg"></div>
                 </div>
                 <p class="lead">Con lo que tengas a mano</p>
@@ -39,17 +39,16 @@
                           <input type="text" class="form-control shadow p-3 mb-3 bg-white rounded" id="ingrediente" placeholder="Ingresar..." ng-model="add.nombre" maxlength="12" onfocus="this.value=''">
                       </form>
                   </div>
-                  <div>
+                  <div class="col-md-4 col-sm-2 col-2">
                       <button type="button" class="btn btn-outline-success" ng-model="titulo" ng-click="add_ingrediente()" id="añadir">+Añadir</button>
-                      <asp:Button ID="buscar" class="btn btn-success" runat="server" Text="Buscar"></asp:Button>
                   </div>
               </div>
               <div class="row"><!--lista-->
-                  <div class="col-md-2 col-1"></div><!--espacio-->
-                  <div class="col-md-8 col-10">
+                  <div class="col-md-2 col-sm-1"></div><!--espacio-->
+                  <div class="col-md-8 col-sm-11">
                     <div ng-if="titulo"><h6>{{title}}</h6></div>
                         <ul class="list-group" id="lista-index">
-                            <li ng-repeat="ingrediente in ingredientes track by $index" ng-model="lista" class="list-group-item d-flex justify-content-between mt-1">
+                            <li ng-repeat="ingrediente in ingredientes track by $index" ng-model="lista" class="list-group-item d-flex justify-content-between my-1">
                                 <div>
                                     {{ ingrediente.nombre }}
                                 </div>
@@ -60,10 +59,22 @@
                             <li>
                                 <div ng-bind-html-unsafe="cocinar"></div>
                             </li>
+                            <li class="d-flex justify-content-center">
+                                <div class="w-50 d-flex justify-content-end">
+                                    <button type="button" class="btn btn-primary col-sm-6 col-6 btn-sm mb-1" ng-click="verDatos()">Confirmar</button>
+                                </div>
+                                &nbsp;
+                                <div class="w-50">
+                                    <asp:Button ID="buscar" class="btn btn-success col-sm-6 col-6 btn-sm" runat="server" Text="Buscar" ></asp:Button>
+                                </div>
+                            </li>
                         </ul>
                   </div>
               </div><!--lista-->
-              <asp:HiddenField ID="objIng" runat="server" />
+              <asp:HiddenField ID="ing0" runat="server" value=""/>
+              <asp:HiddenField ID="ing1" runat="server" value=""/>
+              <asp:HiddenField ID="ing2" runat="server" value=""/>
+              <asp:HiddenField ID="ing3" runat="server" value="" />
           </div>
           <div class="x"></div>
       <!--///buscador-->
